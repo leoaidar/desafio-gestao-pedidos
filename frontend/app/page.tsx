@@ -23,6 +23,8 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Package2, Users } from "lucide-react";
 import { toast } from "sonner";
+import { api } from "@/services/api";
+import { DashboardCards } from "@/components/dashboard/DashboardCards";
 
 interface Order {
   id: string;
@@ -43,62 +45,48 @@ export default function Home() {
     descricao: "",
   });
 
-  const API_URL = "http://localhost:5000";
-
-  const fetchOrders = async () => {
+  const fetchData = async () => {
     try {
-      const response = await fetch(`${API_URL}/pedidos`);
-      const data = await response.json();
-      setOrders(data);
+      const [ordersData, indicatorData] = await Promise.all([
+        api.getPedidos(),
+        api.getIndicador()
+      ]);
+      
+      setOrders(ordersData);
+      setIndicator(indicatorData.media_pedidos_por_cliente);
     } catch (error) {
-      toast.error("Erro ao carregar pedidos");
-    }
-  };
-
-  const fetchIndicator = async () => {
-    try {
-      const response = await fetch(`${API_URL}/indicador`);
-      const data = await response.json();
-      setIndicator(data.media_pedidos_por_cliente);
-    } catch (error) {
-      toast.error("Erro ao carregar indicador");
+      toast.error("Erro ao carregar dados");
     }
   };
 
   useEffect(() => {
-    fetchOrders();
-    fetchIndicator();
+    fetchData();
   }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     try {
-      const method = editingOrder ? "PUT" : "POST";
-      const url = editingOrder 
-        ? `${API_URL}/pedidos/${editingOrder.id}`
-        : `${API_URL}/pedidos`;
-
-      const response = await fetch(url, {
-        method,
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
+      if (editingOrder) {
+        await api.updatePedido(editingOrder.id, {
           cliente: formData.cliente,
           valor: parseFloat(formData.valor),
           descricao: formData.descricao,
-        }),
-      });
-
-      if (response.ok) {
-        toast.success(editingOrder ? "Pedido atualizado" : "Pedido criado");
-        setIsOpen(false);
-        setFormData({ cliente: "", valor: "", descricao: "" });
-        setEditingOrder(null);
-        fetchOrders();
-        fetchIndicator();
+        });
+        toast.success("Pedido atualizado");
+      } else {
+        await api.createPedido({
+          cliente: formData.cliente,
+          valor: parseFloat(formData.valor),
+          descricao: formData.descricao,
+        });
+        toast.success("Pedido criado");
       }
+
+      setIsOpen(false);
+      setFormData({ cliente: "", valor: "", descricao: "" });
+      setEditingOrder(null);
+      fetchData();
     } catch (error) {
       toast.error("Erro ao salvar pedido");
     }
@@ -108,15 +96,9 @@ export default function Home() {
     if (!confirm("Deseja realmente excluir este pedido?")) return;
 
     try {
-      const response = await fetch(`${API_URL}/pedidos/${id}`, {
-        method: "DELETE",
-      });
-
-      if (response.ok) {
-        toast.success("Pedido excluído");
-        fetchOrders();
-        fetchIndicator();
-      }
+      await api.deletePedido(id);
+      toast.success("Pedido excluído");
+      fetchData();
     } catch (error) {
       toast.error("Erro ao excluir pedido");
     }
@@ -136,29 +118,10 @@ export default function Home() {
     <div className="container mx-auto py-8">
       <h1 className="text-4xl font-bold mb-8">Sistema de Gestão de Pedidos</h1>
 
-      <div className="grid gap-4 md:grid-cols-2 mb-8">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total de Pedidos</CardTitle>
-            <Package2 className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{orders.length}</div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">
-              Média de Pedidos por Cliente
-            </CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{indicator.toFixed(2)}</div>
-          </CardContent>
-        </Card>
-      </div>
+      <DashboardCards 
+        totalPedidos={orders.length} 
+        mediaPedidosPorCliente={indicator} 
+      />
 
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-2xl font-semibold">Pedidos</h2>
