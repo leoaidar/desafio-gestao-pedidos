@@ -10,9 +10,9 @@ export const api = {
     const response = await fetch(`${API_URL}/api/pedidos/indicador`);
     return response.json();
   },
-
+  
   createPedido: async (pedido: { cliente: string; valor: number; descricao: string }) => {
-    const response = await fetch(`${API_URL}/api/pedidos`, {
+    const response = await fetch(`${API_URL}/api/pedidos/`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(pedido)

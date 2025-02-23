@@ -1,4 +1,4 @@
-from flask import Flask
+from flask import Flask, request
 from flask_cors import CORS
 from flask_restx import Api
 from .extensions import db, ma
@@ -22,14 +22,9 @@ def create_app(config_name='default'):
     app.config['SWAGGER_UI_DOC_EXPANSION'] = 'list'
     app.config['RESTX_ERROR_404_HELP'] = False
 
-    # CORS
-    CORS(app, resources={
-        r"/*": {
-            "origins": "*",
-            "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-            "allow_headers": ["Content-Type", "Authorization"]
-        }
-    })
+
+    CORS(app, resources={r"/*": {"origins": ["http://localhost:3000", "http://localhost:3001"]}})
+
 
     rest_api.init_app(app)
     db.init_app(app)
