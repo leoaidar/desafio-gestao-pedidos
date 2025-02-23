@@ -1,3 +1,3 @@
-from .pedidos import pedidos_bp
+from .pedidos import api as pedidos_ns
 
-__all__ = ['pedidos_bp'] 
+__all__ = ['pedidos_ns'] 

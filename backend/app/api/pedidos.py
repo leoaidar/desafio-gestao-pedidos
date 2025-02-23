@@ -1,44 +1,76 @@
-from flask import Blueprint, request, jsonify
+from flask_restx import Namespace, Resource, fields
 from ..services.pedido_service import PedidoService
 from ..schemas.pedido import PedidoSchema
 
-pedidos_bp = Blueprint('pedidos', __name__)
+api = Namespace('pedidos', description='Operações de pedidos')
+
 pedido_service = PedidoService()
 pedido_schema = PedidoSchema()
 pedidos_schema = PedidoSchema(many=True)
 
-@pedidos_bp.route('/pedidos', methods=['POST'])
-def criar_pedido():
-    dados = request.get_json()
-    pedido = pedido_service.criar_pedido(dados)
-    return pedido_schema.dump(pedido), 201
+#Swagger
+pedido_model = api.model('Pedido', {
+    'cliente': fields.String(required=True, description='Nome do cliente'),
+    'valor': fields.Float(required=True, description='Valor do pedido'),
+    'descricao': fields.String(description='Descrição do pedido')
+})
 
-@pedidos_bp.route('/pedidos', methods=['GET'])
-def listar_pedidos():
-    pedidos = pedido_service.listar_pedidos()
-    return pedidos_schema.dump(pedidos)
+pedido_response = api.inherit('PedidoResponse', pedido_model, {
+    'id': fields.String(description='ID do pedido'),
+    'data_criacao': fields.DateTime(description='Data de criação do pedido')
+})
 
-@pedidos_bp.route('/pedidos/<pedido_id>', methods=['GET'])
-def obter_pedido(pedido_id):
-    pedido = pedido_service.obter_pedido(pedido_id)
-    if pedido is None:
-        return {'message': 'Pedido não encontrado'}, 404
-    return pedido_schema.dump(pedido)
+@api.route('/')
+class PedidoList(Resource):
+    @api.doc('listar_pedidos')
+    @api.marshal_list_with(pedido_response)
+    def get(self):
+        """Lista todos os pedidos"""
+        pedidos = pedido_service.listar_pedidos()
+        return pedidos_schema.dump(pedidos)
 
-@pedidos_bp.route('/pedidos/<pedido_id>', methods=['PUT'])
-def atualizar_pedido(pedido_id):
-    dados = request.get_json()
-    pedido = pedido_service.atualizar_pedido(pedido_id, dados)
-    if pedido is None:
-        return {'message': 'Pedido não encontrado'}, 404
-    return pedido_schema.dump(pedido)
+    @api.doc('criar_pedido')
+    @api.expect(pedido_model)
+    @api.marshal_with(pedido_response, code=201)
+    def post(self):
+        """Cria um novo pedido"""
+        dados = api.payload
+        pedido = pedido_service.criar_pedido(dados)
+        return pedido_schema.dump(pedido), 201
 
-@pedidos_bp.route('/pedidos/<pedido_id>', methods=['DELETE'])
-def remover_pedido(pedido_id):
-    if pedido_service.remover_pedido(pedido_id):
-        return {'message': 'Pedido removido com sucesso'}
-    return {'message': 'Pedido não encontrado'}, 404
+@api.route('/<string:pedido_id>')
+@api.param('pedido_id', 'ID do pedido')
+class Pedido(Resource):
+    @api.doc('obter_pedido')
+    @api.marshal_with(pedido_response)
+    def get(self, pedido_id):
+        """Obtém um pedido específico"""
+        pedido = pedido_service.obter_pedido(pedido_id)
+        if pedido is None:
+            api.abort(404, "Pedido não encontrado")
+        return pedido_schema.dump(pedido)
 
-@pedidos_bp.route('/indicador', methods=['GET'])
-def calcular_indicador():
-    return jsonify(pedido_service.calcular_indicadores()) 
+    @api.doc('atualizar_pedido')
+    @api.expect(pedido_model)
+    @api.marshal_with(pedido_response)
+    def put(self, pedido_id):
+        """Atualiza um pedido"""
+        dados = api.payload
+        pedido = pedido_service.atualizar_pedido(pedido_id, dados)
+        if pedido is None:
+            api.abort(404, "Pedido não encontrado")
+        return pedido_schema.dump(pedido)
+
+    @api.doc('remover_pedido')
+    def delete(self, pedido_id):
+        """Remove um pedido"""
+        if pedido_service.remover_pedido(pedido_id):
+            return {'message': 'Pedido removido com sucesso'}
+        api.abort(404, "Pedido não encontrado")
+
+@api.route('/indicador')
+class Indicador(Resource):
+    @api.doc('calcular_indicador')
+    def get(self):
+        """Calcula a média de pedidos por cliente"""
+        return pedido_service.calcular_indicadores() 
